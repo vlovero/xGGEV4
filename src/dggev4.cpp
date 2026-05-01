@@ -1,17 +1,116 @@
-#include "linalg.h"
+#include "tgevc3.h"
+#include "xggev4.h"
 #include <algorithm>
+#include <cassert>
 #include <cstddef>
-#include <cstring>
-#include <omp.h>
+
+// void dtgevc3(char side, char howmny, const int *select, int n, const double *S, int lds, const double *P, int ldp, const double *alphar, const double *alphai, const double *beta, double *VL, int ldvl, double *VR, int ldvr, int mm, int *m, double *work, int lwork, int *info);
+// void stgevc3(char side, char howmny, const int *select, int n, const float *S, int lds, const float *P, int ldp, const float *alphar, const float *alphai, const float *beta, RP(float) VL, int ldvl, RP(float) VR, int ldvr, int mm, int *m, RP(float) work, int lwork, int *info);
+// void ztgevc3(char side, char howmny, const int *select, int n, const std::complex<double> *S, int lds, const std::complex<double> *P, int ldp, const std::complex<double> *alpha, const std::complex<double> *beta, RP(std::complex<double>) VL, int ldvl, RP(std::complex<double>) VR, int ldvr, int mm, int *m, RP(std::complex<double>) work, int lwork, int *info);
+// void ctgevc3(char side, char howmny, const int *select, int n, const std::complex<float> *S, int lds, const std::complex<float> *P, int ldp, const std::complex<float> *alpha, const std::complex<float> *beta, RP(std::complex<float>) VL, int ldvl, RP(std::complex<float>) VR, int ldvr, int mm, int *m, RP(std::complex<float>) work, int lwork, int *info);
+
+extern "C" {
+    double dlange_(const char *norm, const int *m, const int *n, const double *A, const int *ldA, double *work);
+    void dgemm_(const char *, const char *, const int *, const int *, const int *, const double *, const double *, const int *, const double *, const int *, const double *, double *, const int *);
+    void dtrsm_(const char *side, const char *uplo, const char *transa, const char *diag, const int *m, const int *n, const double *alpha, const double *A, const int *lda, double *B, const int *ldb);
+    void dgehrd_(const int *n, const int *ilo, const int *ihi, double *A, const int *lda, double *tau, double *work, const int *lwork, int *info);
+    void dormhr_(const char *side, const char *trans, const int *m, const int *n, const int *ilo, const int *ihi, const double *A, const int *lda, const double *tau, double *C, const int *ldc, double *work, const int *lwork, int *info);
+    void dorghr_(const int *n, const int *ilo, const int *ihi, double *A, const int *lda, const double *tau, double *work, const int *lwork, int *info);
+    void dgerqf_(const int *m, const int *n, double *A, const int *lda, double *tau, double *work, const int *lwork, int *info);
+    void dormrq_(const char *side, const char *trans, const int *m, const int *n, const int *k, const double *A, const int *lda, const double *tau, double *C, const int *ldc, double *work, const int *lwork, int *info);
+    void dgeqrf_(const int *m, const int *n, double *A, const int *lda, double *tau, double *work, const int *lwork, int *info);
+    void dormqr_(const char *side, const char *trans, const int *m, const int *n, const int *k, const double *A, const int *lda, const double *tau, double *C, const int *ldc, double *work, const int *lwork, int *info);
+    void dorgqr_(const int *m, const int *n, const int *k, double *A, const int *lda, const double *tau, double *work, const int *lwork, int *info);
+    void dgeqp3_(const int32_t *m, const int32_t *n, double *A, const int32_t *lda, int32_t *JPVT, double *tau, double *work, const int32_t *lwork, int32_t *info);
+    void dlapmr_(const int32_t *forwrd, const int32_t *m, const int32_t *n, double *X, const int32_t *ldx, int32_t *K);
+    void dggbal_(const char *job, const int *n, double *A, const int *ldA, double *B, const int *ldB, int *ilo, int *ihi, double *lscale, double *rscale, double *work, int *info);
+    void dlaqz0_(const char *wants, const char *wantq, const char *wantz, const int *n, const int *ilo, const int *ihi, double *A, const int *lda, double *B, const int *ldb, double *alphar, double *alphai, double *beta, double *Q, const int *ldq, double *Z, const int *ldz, double *work, const int *lwork, const int *rec, int *info);
+}
+
+void dgemm(const char *transa, const char *transb, const int nrow_op_a, const int ncol_op_b, const int nrow_op_b, const double alpha, const double *a, const int lda, const double *b, const int ldb, const double beta, double *c, const int ldc)
+{
+    dgemm_(transa, transb, &nrow_op_a, &ncol_op_b, &nrow_op_b, &alpha, a, &lda, b, &ldb, &beta, c, &ldc);
+}
+
+
+double dlange(const char *norm, const int m, const int n, const double *A, const int ldA, double *work)
+{
+    return dlange_(norm, &m, &n, A, &ldA, work);
+}
+
+void dlapmr(const int32_t forwrd, const int32_t m, const int32_t n, double *X, const int32_t ldx, int32_t *K)
+{
+    dlapmr_(&forwrd, &m, &n, X, &ldx, K);
+}
+
+void dlaqz0(const char *job, const char *compq, const char *compz, const int n, const int ilo, const int ihi, double *A, const int lda, double *B, const int ldb, double *alphar, double *alphai, double *beta, double *Q, const int ldq, double *Z, const int ldz, double *work, const int lwork, const int rec, int *info)
+{
+    dlaqz0_(job, compq, compz, &n, &ilo, &ihi, A, &lda, B, &ldb, alphar, alphai, beta, Q, &ldq, Z, &ldz, work, &lwork, &rec, info);
+}
+
+void dggbal(const char *job, const int n, double *A, const int ldA, double *B, const int ldB, int *ilo, int *ihi, double *lscale, double *rscale, double *work, int *info)
+{
+    dggbal_(job, &n, A, &ldA, B, &ldB, ilo, ihi, lscale, rscale, work, info);
+}
+
+void dorgqr(const int m, const int n, const int k, double *A, const int lda, const double *tau, double *work, const int lwork, int *info)
+{
+    dorgqr_(&m, &n, &k, A, &lda, tau, work, &lwork, info);
+}
+
+void dorghr(const int n, const int ilo, const int ihi, double *A, const int lda, const double *tau, double *work, const int lwork, int *info)
+{
+    dorghr_(&n, &ilo, &ihi, A, &lda, tau, work, &lwork, info);
+}
+
+void dgeqp3(const int32_t m, const int32_t n, double *A, const int32_t lda, int32_t *JPVT, double *tau, double *work, const int32_t lwork, int32_t *info)
+{
+    dgeqp3_(&m, &n, A, &lda, JPVT, tau, work, &lwork, info);
+}
+
+void dgehrd(const int n, const int ilo, const int ihi, double *A, const int lda, double *tau, double *work, const int lwork, int *info)
+{
+    dgehrd_(&n, &ilo, &ihi, A, &lda, tau, work, &lwork, info);
+}
+
+void dormhr(const char *side, const char *trans, const int m, const int n, const int ilo, const int ihi, const double *A, const int lda, const double *tau, double *C, const int ldc, double *work, const int lwork, int *info)
+{
+    dormhr_(side, trans, &m, &n, &ilo, &ihi, A, &lda, tau, C, &ldc, work, &lwork, info);
+}
+
+void dgeqrf(const int m, const int n, double *A, const int lda, double *tau, double *work, const int lwork, int *info)
+{
+    dgeqrf_(&m, &n, A, &lda, tau, work, &lwork, info);
+}
+
+void dormqr(const char *side, const char *trans, const int m, const int n, const int k, const double *A, const int lda, const double *tau, double *C, const int ldc, double *work, const int lwork, int *info)
+{
+    dormqr_(side, trans, &m, &n, &k, A, &lda, tau, C, &ldc, work, &lwork, info);
+}
+
+void dgerqf(const int m, const int n, double *A, const int lda, double *tau, double *work, const int lwork, int *info)
+{
+    dgerqf_(&m, &n, A, &lda, tau, work, &lwork, info);
+}
+
+void dormrq(const char *side, const char *trans, const int m, const int n, const int k, const double *A, const int lda, const double *tau, double *C, const int ldc, double *work, const int lwork, int *info)
+{
+    dormrq_(side, trans, &m, &n, &k, A, &lda, tau, C, &ldc, work, &lwork, info);
+}
+
+void dtrsm(const char *side, const char *uplo, const char *transa, const char *diag, const int m, const int n, const double alpha, const double *A, const int lda, double *B, const int ldb)
+{
+    dtrsm_(side, uplo, transa, diag, &m, &n, &alpha, A, &lda, B, &ldb);
+}
+
 
 // not perfect but more cache optimized inplace transpose for square martices
 void dlatrn(const ptrdiff_t n, double *A, const ptrdiff_t ldA)
 {
-    constexpr ptrdiff_t block_size = 32;
+    constexpr ptrdiff_t block_size = 8;
     double buff1[block_size * block_size];
     double temp;
     ptrdiff_t i, j, ii, jj, nn, r, m1, m2, k, kk;
-    int num_threads;
 
     if (n <= 1) {
         return;
@@ -26,10 +125,6 @@ void dlatrn(const ptrdiff_t n, double *A, const ptrdiff_t ldA)
         }
         return;
     }
-
-    num_threads = (n >= 256) ? (n / 64) : 1;
-    num_threads = std::min(omp_get_max_threads(), num_threads);
-    (void)num_threads; // silence unused variable warning
     // num_threads = 1;
 
     r = n % block_size;
@@ -37,7 +132,6 @@ void dlatrn(const ptrdiff_t n, double *A, const ptrdiff_t ldA)
 
     // size of matrix is divisible by block size
     if (r == 0) {
-#pragma omp parallel for private(i, j, buff1, ii, jj, k, kk, temp) firstprivate(A, ldA, n, nn) num_threads(num_threads)
         for (i = 0; i < nn; i += block_size) {
             // transpose along main diagonal
             for (ii = i, k = 0; ii < i + block_size; ii++, k++) {
@@ -113,7 +207,6 @@ void dlatrn(const ptrdiff_t n, double *A, const ptrdiff_t ldA)
         }
     }
 
-#pragma omp parallel for private(i, j, buff1, ii, jj, k, kk, temp) firstprivate(m1, m2, A, ldA, n) num_threads(num_threads)
     for (j = m1 + m2; j < n; j += block_size) {
         // top blocks
         for (i = 0; i < m1; i++) {
@@ -357,12 +450,20 @@ void dgghd4(const char *compq, const char *compz, const ptrdiff_t n, const int i
     }
 
     norma = dlange("F", n, n, A, ldA, work);
+    // norma = 0.0;
+    // for (i = 0; i < n; i++) {
+    //     for (j = 0; j < n; j++) {
+    //         norma = std::max(norma, std::abs(A[i * ldA + j]));
+    //     }
+    // }
     tol = eps * norma;
     niter = 0;
     k = ilo;
     while (k < n) {
         niter++;
         ncols = ihi - k;
+        // printf("%2d : %5ld/%5d : %5ld\n", niter, k, ncols, n);
+        // fmt::println("{:2d} : {:5d}/{:5d} : {:5d}", niter, k, ncols, n);
         // copy A into X
         for (size_t i = k, ii = 0; i < (size_t)n; i++, ii++) {
             for (size_t j = k, jj = 0; j < (size_t)n; j++, jj++) {
@@ -414,7 +515,7 @@ void dgghd4(const char *compq, const char *compz, const ptrdiff_t n, const int i
     }
 }
 
-void deflate1(const bool compvl, const bool compvr, const ptrdiff_t n, const ptrdiff_t k, double *A, const ptrdiff_t ldA, double *B, const ptrdiff_t ldB, double *vl, const ptrdiff_t ldvl, double *vr, const ptrdiff_t ldvr, double *work, const int lwork, int *info)
+void dggdef(const bool compvl, const bool compvr, const ptrdiff_t n, const ptrdiff_t k, double *A, const ptrdiff_t ldA, double *B, const ptrdiff_t ldB, double *vl, const ptrdiff_t ldvl, double *vr, const ptrdiff_t ldvr, double *work, const int lwork, int *info)
 {
     ptrdiff_t i;
     // QR portion
@@ -449,84 +550,10 @@ void deflate1(const bool compvl, const bool compvr, const ptrdiff_t n, const ptr
     }
 }
 
-// deflate using smalling tiles for qr and rq
-// this is much slower. I haven't counted the FLOPS
-// but it might be significantly more due to the
-// overlap with each block
-void deflate2(const bool compvl, const bool compvr, const ptrdiff_t n, const ptrdiff_t k, double *A, const ptrdiff_t ldA, double *B, const ptrdiff_t ldB, double *vl, const ptrdiff_t ldvl, double *vr, const ptrdiff_t ldvr, double *work, const int lwork, int *info)
-{
-    const int NB = 32;
-    int i, j, N2, i0, i1, j0, j1, qrlwork, M1, M2;
-    ptrdiff_t ii, jj;
-    double *X, *tau, *qrwork;
-    bool do_rq;
-    auto [N1, r1] = div((int)k, NB);
-
-    N2 = n / NB;
-    tau = work;
-    qrwork = &work[2 * NB];
-    qrlwork = lwork - 2 * NB;
-
-    for (j = 0; j < (N1 + (r1 != 0)); j++) {
-        for (i = 0; i < (N2 - j); i++) {
-            i0 = std::max<int>(j * NB, n - (2 + i) * NB);
-            i1 = i0 + 2 * NB;
-            j0 = (j + 0) * NB;
-            j1 = std::min<int>(k, (j + 1) * NB);
-            if (i1 <= k) {
-                i0 = j * NB;
-                i1 = k;
-                do_rq = false;
-            }
-            else {
-                do_rq = true;
-            }
-
-            X = &A[j0 * ldA + i0];
-            M1 = i1 - i0;
-            M2 = j1 - j0;
-            dgeqrf(M1, M2, X, ldA, tau, qrwork, qrlwork, info);
-            // A[i0:i1, j1:] = Q.T @ A[i0:i1, j1:]
-            dormqr("L", "T", M1, n - j1, M2, X, ldA, tau, &A[j1 * ldA + i0], ldA, qrwork, qrlwork, info);
-            // B[i0:i1, j1:] = Q.T @ B[i0:i1, j1:]
-            dormqr("L", "T", M1, n - j1, M2, X, ldA, tau, &B[j1 * ldB + i0], ldB, qrwork, qrlwork, info);
-            if (compvl) {
-                throw std::runtime_error("deflate2 VL not implemented");
-            }
-            // zero out reflectors in A
-            for (ii = 0; ii < M2; ii++) {
-                for (jj = ii + 1; jj < M1; jj++) {
-                    X[ii * ldA + jj] = 0;
-                }
-            }
-
-            if (!do_rq) {
-                break;
-            }
-
-            X = &B[i0 * (ldB + 1)];
-            dgerqf(M1, M1, X, ldB, tau, qrwork, qrlwork, info);
-            // B[:i0, i0:i1] = B[:i0, i0:i1] @ Q.T
-            dormrq("R", "T", i0, M1, M1, X, ldB, tau, &B[i0 * ldB], ldB, qrwork, qrlwork, info);
-            // A[:, i0:i1] = A[:, i0:i1] @ Q.T
-            dormrq("R", "T", n, M1, M1, X, ldB, tau, &A[i0 * ldA], ldA, qrwork, qrlwork, info);
-            if (compvr) {
-                throw std::runtime_error("deflate2 VR not implemented");
-            }
-            // zero out block in B
-            for (ii = 0; ii < M1; ii++) {
-                for (jj = ii + 1; jj < M1; jj++) {
-                    X[ii * ldB + jj] = 0;
-                }
-            }
-        }
-    }
-}
-
 void dggev4(const char *jobvl, const char *jobvr, const int n, double *A, const int ldA, double *B, const int ldB, double *alphar, double *alphai, double *beta, double *vl, const int ldvl, double *vr, const int ldvr, double *work, const int lwork, int *jpvt, int *info)
 {
     int workneeded, ninfinite, in;
-    double dummy[1], normb, tol, eps, tmp;
+    double dummy[1], tol, tmp;
     bool compvl, compvr;
     char jobqz, jobvec;
     ptrdiff_t i, j, k;
@@ -546,9 +573,7 @@ void dggev4(const char *jobvl, const char *jobvr, const int n, double *A, const 
     else {
         jobvec = 'N';
     }
-    eps = std::numeric_limits<double>::epsilon();
-
-    // TODO: add argument checks and balancing
+    // argument checks
 
     // workspace queries
     workneeded = 0;
@@ -566,6 +591,8 @@ void dggev4(const char *jobvl, const char *jobvr, const int n, double *A, const 
     workneeded = std::max(workneeded, (int)*dummy);
     dlaqz0(&jobqz, jobvl, jobvr, n, 1, n, A, ldA, B, ldB, alphar, alphai, beta, vl, ldvl, vr, ldvr, dummy, -1, 0, info);
     workneeded = std::max(workneeded, (int)*dummy);
+    dtgevc3(jobvec, 'B', NULL, n, A, ldA, B, ldB, alphar, alphai, beta, vl, ldvl, vr, ldvr, n, &in, dummy, -1, info);
+    workneeded = std::max(workneeded, (int)*dummy);
 
     if (lwork == -1) {
         *info = 0;
@@ -575,7 +602,6 @@ void dggev4(const char *jobvl, const char *jobvr, const int n, double *A, const 
 
     // Step 1: Preprocessing
     dggprp(compvl, compvr, n, A, ldA, B, ldB, vl, ldvl, vr, ldvr, work, lwork, jpvt, info);
-    normb = work[0];
     tol = work[1];
     ninfinite = 0;
     for (k = 0; k < n; k++) {
@@ -589,15 +615,12 @@ void dggev4(const char *jobvl, const char *jobvr, const int n, double *A, const 
 
     // Step 2: Deflation
     if (ninfinite) {
-        deflate1(compvl, compvr, n, k, A, ldA, B, ldB, vl, ldvl, vr, ldvr, work, lwork, info);
+        dggdef(compvl, compvr, n, k, A, ldA, B, ldB, vl, ldvl, vr, ldvr, work, lwork, info);
     }
 
     // add small pertubation to B if needed
     // sometimes a very small amount of infinite eigenvalues
     // can be revealed when B has some near zero singular values
-    // TODO: this leads to an extra iteration in the xGGHD4 rountine
-    // so handle it more efficiently that fixed this. xGGEV4 is still
-    // faster than xGGEV3 with this issue.
     for (i = k; i < n; i++) {
         if (tol < std::abs(B[i * ldB + i])) {
             break;
@@ -615,7 +638,7 @@ void dggev4(const char *jobvl, const char *jobvr, const int n, double *A, const 
     }
     // Step 5: Eigenvectors
     if (compvl || compvr) {
-        dtgevc(&jobvec, "B", NULL, n, A, ldA, B, ldB, vl, ldvl, vr, ldvr, n, &in, work, info);
+        dtgevc3(jobvec, 'B', NULL, n, A, ldA, B, ldB, alphar, alphai, beta, vl, ldvl, vr, ldvr, n, &in, work, lwork, info);
     }
     if (compvl) {
         for (i = 0; i < n; i++) {
