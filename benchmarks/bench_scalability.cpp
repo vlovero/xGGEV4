@@ -467,7 +467,7 @@ static void apply_args(benchmark::internal::Benchmark *b)
 static void apply_args_evc(benchmark::internal::Benchmark *b)
 {
     constexpr int num_threads[] = { 1, 2, 4, 6, 8, 10, 12, 14, 16, 18, 20, 22, 24 };
-    constexpr int sizes[] = { 8000 };
+    constexpr int sizes[] = { 16000 };
     for (const auto num : num_threads) {
         for (const auto size : sizes) {
             b->Args({ size, num });
